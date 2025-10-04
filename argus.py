@@ -12,9 +12,9 @@ STREAM_PORT = 8000
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
-CHUNK = 1024
-AUDIO_DATA_SIZE = CHUNK * CHANNELS * 2
 FPS = 20.0
+CHUNK = int(RATE / FPS) # Synchronize audio chunk size with video frame rate
+AUDIO_DATA_SIZE = CHUNK * CHANNELS * 2
 
 def main():
     """Connects to the server and streams audio and video at a controlled frame rate."""
