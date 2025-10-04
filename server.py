@@ -26,7 +26,7 @@ def main():
     conn, addr = server_socket.accept()
     print(f"Streaming client connected from {addr}")
 
-    audio_stream = pyaudio.PyAudio().open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK, output_device_index=20)
+    audio_stream = pyaudio.PyAudio().open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK, output_device_index=19)
 
     data = b""
     payload_size = struct.calcsize(">L")
