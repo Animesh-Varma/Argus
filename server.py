@@ -1,6 +1,7 @@
 import socket
 import threading
 import cv2
+import numpy as np
 import pyaudio
 import struct
 
@@ -55,7 +56,8 @@ def main():
             audio_frame_data = frame_data[-CHUNK:]
 
             # Display video
-            frame = cv2.imdecode(cv2.imdecode(video_data, 1), 1)
+            nparr = np.frombuffer(video_data, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             cv2.imshow('Video', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break

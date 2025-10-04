@@ -39,7 +39,8 @@ def main():
             audio_data = audio_stream.read(CHUNK)
 
             # Pack and send data
-            data = struct.pack(">L", len(video_data)) + video_data + audio_data
+            payload = video_data + audio_data
+            data = struct.pack(">L", len(payload)) + payload
             client_socket.sendall(data)
 
     except (BrokenPipeError, ConnectionResetError):
