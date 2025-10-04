@@ -1,0 +1,1 @@
+CreateObject("Wscript.Shell").Run "pythonw.exe argus.py", 0, False

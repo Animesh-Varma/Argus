@@ -1,2 +1,2 @@
 @echo off
-pythonw.exe argus.py
+wscript.exe run_hidden.vbs

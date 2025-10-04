@@ -11,9 +11,10 @@ STREAM_PORT = 8000
 
 # Audio configuration
 FORMAT = pyaudio.paInt16
-CHANNELS = 1
+CHANNELS = 2
 RATE = 44100
 CHUNK = 1024
+AUDIO_DATA_SIZE = CHUNK * CHANNELS * 2
 
 def main():
     """Starts the streaming server."""
@@ -25,7 +26,7 @@ def main():
     conn, addr = server_socket.accept()
     print(f"Streaming client connected from {addr}")
 
-    audio_stream = pyaudio.PyAudio().open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK, output_device_index=0)
+    audio_stream = pyaudio.PyAudio().open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK, output_device_index=20)
 
     data = b""
     payload_size = struct.calcsize(">L")
@@ -52,8 +53,8 @@ def main():
             data = data[msg_size:]
 
             # Extract video and audio data
-            video_data = frame_data[:-CHUNK]
-            audio_frame_data = frame_data[-CHUNK:]
+            video_data = frame_data[:-AUDIO_DATA_SIZE]
+            audio_frame_data = frame_data[-AUDIO_DATA_SIZE:]
 
             # Display video
             nparr = np.frombuffer(video_data, np.uint8)

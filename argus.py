@@ -9,9 +9,10 @@ STREAM_PORT = 8000
 
 # Audio configuration
 FORMAT = pyaudio.paInt16
-CHANNELS = 1
+CHANNELS = 2
 RATE = 44100
 CHUNK = 1024
+AUDIO_DATA_SIZE = CHUNK * CHANNELS * 2
 
 def main():
     """Connects to the server and streams audio and video."""
