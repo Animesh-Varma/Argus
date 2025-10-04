@@ -4,7 +4,7 @@ import pyaudio
 import struct
 
 # Client configuration
-SERVER_HOST = "192.168.29.1"  # Replace with the server's IP address
+SERVER_HOST = "192.168.29.21"  # Replace with the server's IP address
 STREAM_PORT = 8000
 
 # Audio configuration
