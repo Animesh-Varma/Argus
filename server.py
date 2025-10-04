@@ -25,7 +25,7 @@ def main():
     conn, addr = server_socket.accept()
     print(f"Streaming client connected from {addr}")
 
-    audio_stream = pyaudio.PyAudio().open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
+    audio_stream = pyaudio.PyAudio().open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK, output_device_index=0)
 
     data = b""
     payload_size = struct.calcsize(">L")
@@ -63,7 +63,10 @@ def main():
                 break
 
             # Play audio
-            audio_stream.write(audio_frame_data)
+            try:
+                audio_stream.write(audio_frame_data)
+            except Exception as e:
+                print(f"Audio playback error: {e}")
 
     except (BrokenPipeError, ConnectionResetError):
         print("Client disconnected.")
