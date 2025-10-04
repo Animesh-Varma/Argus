@@ -16,6 +16,8 @@ CHUNK = 1024
 def main():
     """Connects to the server and streams audio and video."""
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    cap = None
+    audio_stream = None
     try:
         client_socket.connect((SERVER_HOST, STREAM_PORT))
         print(f"Connected to server at {SERVER_HOST}:{STREAM_PORT}")
@@ -47,9 +49,11 @@ def main():
     except Exception as e:
         print(f"Error: {e}")
     finally:
-        cap.release()
-        audio_stream.stop_stream()
-        audio_stream.close()
+        if cap:
+            cap.release()
+        if audio_stream:
+            audio_stream.stop_stream()
+            audio_stream.close()
         pyaudio.PyAudio().terminate()
         client_socket.close()
         print("Client stopped.")
