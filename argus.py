@@ -5,7 +5,7 @@ import struct
 import time
 
 # Client configuration
-SERVER_HOST = "ms-revolutionary.gl.at.ply.gg"
+SERVER_HOST = "211.ip.gl.ply.gg"
 STREAM_PORT = 40815
 
 # Audio/Video configuration
