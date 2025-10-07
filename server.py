@@ -7,8 +7,8 @@ import os
 import sys
 import wave
 import subprocess
+import threading
 from datetime import datetime
-from contextlib import contextmanager
 
 # Streaming server configuration
 STREAM_HOST = "0.0.0.0"
@@ -19,45 +19,16 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 48000
 VIDEO_FPS = 20.0
-CHUNK = int(RATE / VIDEO_FPS) # Synchronize audio chunk size with video frame rate
-AUDIO_DATA_SIZE = CHUNK * CHANNELS * 2
+CHUNK = int(RATE / VIDEO_FPS)
 
-@contextmanager
-def ignore_stderr():
-    """A context manager to temporarily redirect stderr to dev/null."""
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    old_stderr = os.dup(2)
-    sys.stderr.flush()
-    os.dup2(devnull, 2)
-    os.close(devnull)
-    try:
-        yield
-    finally:
-        os.dup2(old_stderr, 2)
-        os.close(old_stderr)
+def list_audio_devices(p):
+    print("Available audio output devices:")
+    for i in range(p.get_device_count()):
+        dev = p.get_device_info_by_index(i)
+        if dev['maxOutputChannels'] > 0:
+            print(f"  Index {dev['index']}: {dev['name']}")
 
-def get_default_output_device_index(p):
-    """Tries to find the default system output device."""
-    try:
-        with ignore_stderr():
-            device_info = p.get_default_output_device_info()
-        return device_info['index']
-    except IOError:
-        print("Could not find default output device. Using fallback.")
-        return 0
-
-def main():
-    """Starts the streaming server in either stream or record mode."""
-    mode = ''''''
-    while mode not in ['stream', 'record']:
-        mode = input("Enter mode ('stream' or 'record'): ").lower()
-
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((STREAM_HOST, STREAM_PORT))
-    server_socket.listen(1)
-    print(f"Streaming server listening on {STREAM_HOST}:{STREAM_PORT}...")
-
-    conn, addr = server_socket.accept()
+def handle_client(conn, addr, mode, device_index):
     print(f"Streaming client connected from {addr}")
 
     p = None
@@ -68,63 +39,66 @@ def main():
     video_path = ""
     audio_path = ""
 
-    if mode == 'stream':
-        print("Attempting to start audio stream...")
-        with ignore_stderr():
+    try:
+        if mode == 'stream':
             p = pyaudio.PyAudio()
+            print(f"[{addr}] Attempting to start audio stream...")
             try:
-                device_index = get_default_output_device_index(p)
                 audio_stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True,
                                       frames_per_buffer=CHUNK, output_device_index=device_index)
-                print("Audio stream opened successfully.")
+                print(f"[{addr}] Audio stream opened successfully on device index {device_index}.")
             except Exception as e:
-                print(f"Failed to open audio stream: {e}")
-    else: # record mode
-        p = pyaudio.PyAudio()
-        timestamp = datetime.now().strftime("recording_%Y-%m-%d_%H-%M-%S")
-        output_folder = os.path.join("output", timestamp)
-        os.makedirs(output_folder, exist_ok=True)
-        print(f"Recording to folder: {output_folder}")
-        
-        audio_path = os.path.join(output_folder, "audio.wav")
-        video_path = os.path.join(output_folder, "video.mp4") # Temp video file
-        wave_file = wave.open(audio_path, 'wb')
-        wave_file.setnchannels(CHANNELS)
-        wave_file.setsampwidth(p.get_sample_size(FORMAT))
-        wave_file.setframerate(RATE)
+                print(f"[{addr}] Failed to open audio stream: {e}")
+        else:  # record mode
+            p = pyaudio.PyAudio()
+            timestamp = datetime.now().strftime(f"recording_{addr[0]}_{addr[1]}_%Y-%m-%d_%H-%M-%S")
+            output_folder = os.path.join("output", timestamp)
+            os.makedirs(output_folder, exist_ok=True)
+            print(f"[{addr}] Recording to folder: {output_folder}")
 
-    data = b""
-    payload_size = struct.calcsize(">L")
+            audio_path = os.path.join(output_folder, "audio.wav")
+            video_path = os.path.join(output_folder, "video.mp4")
+            wave_file = wave.open(audio_path, 'wb')
+            wave_file.setnchannels(CHANNELS)
+            wave_file.setsampwidth(p.get_sample_size(FORMAT))
+            wave_file.setframerate(RATE)
 
-    try:
+        data = b""
+        header_size = struct.calcsize(">LL")
+
         while True:
-            while len(data) < payload_size:
+            while len(data) < header_size:
                 packet = conn.recv(4 * 1024)
                 if not packet: break
                 data += packet
             if not packet: break
 
-            packed_msg_size = data[:payload_size]
-            data = data[payload_size:]
-            msg_size = struct.unpack(">L", packed_msg_size)[0]
+            packed_header = data[:header_size]
+            data = data[header_size:]
+            video_len, audio_len = struct.unpack(">LL", packed_header)
 
-            while len(data) < msg_size:
+            while len(data) < video_len + audio_len:
                 data += conn.recv(4 * 1024)
 
-            frame_data = data[:msg_size]
-            data = data[msg_size:]
-
-            video_data = frame_data[:-AUDIO_DATA_SIZE]
-            audio_frame_data = frame_data[-AUDIO_DATA_SIZE:]
+            video_data = data[:video_len]
+            audio_frame_data = data[video_len:video_len + audio_len]
+            data = data[video_len + audio_len:]
 
             if mode == 'stream':
                 nparr = np.frombuffer(video_data, np.uint8)
                 frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                if frame is not None: cv2.imshow('Video', frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'): break
-                if audio_stream: audio_stream.write(audio_frame_data)
-            
-            else: # record mode
+                window_name = f'Video from {addr}'
+                if frame is not None:
+                    cv2.imshow(window_name, frame)
+
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    break
+                
+                if audio_stream:
+                    audio_stream.write(audio_frame_data)
+
+            else:  # record mode
                 if video_writer is None:
                     nparr = np.frombuffer(video_data, np.uint8)
                     first_frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -136,49 +110,79 @@ def main():
                 else:
                     nparr = np.frombuffer(video_data, np.uint8)
                     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                    if frame is not None: video_writer.write(frame)
-                
+                    if frame is not None:
+                        video_writer.write(frame)
+
                 wave_file.writeframes(audio_frame_data)
 
-    except (BrokenPipeError, ConnectionResetError): print("Client disconnected.")
-    except KeyboardInterrupt: print("Stopping server.")
-    except Exception as e: print(f"Streaming error: {e}")
+    except (BrokenPipeError, ConnectionResetError):
+        print(f"Client {addr} disconnected.")
+    except Exception as e:
+        print(f"Error with client {addr}: {e}")
     finally:
-        # Close all streams and files
-        if audio_stream: audio_stream.close()
-        if wave_file: wave_file.close()
-        if video_writer: video_writer.release()
-        if p: p.terminate()
+        if audio_stream:
+            audio_stream.stop_stream()
+            audio_stream.close()
+        if wave_file:
+            wave_file.close()
+        if video_writer:
+            video_writer.release()
+        if p:
+            p.terminate()
         conn.close()
-        server_socket.close()
-        cv2.destroyAllWindows()
-        print("Streaming stopped.")
+        cv2.destroyWindow(f'Video from {addr}')
+        print(f"Connection with {addr} closed.")
 
-        # --- Automated Merging --- 
-        if mode == 'record' and video_path and audio_path:
-            print("Recording finished. Merging video and audio...")
+        if mode == 'record' and video_path and audio_path and os.path.exists(video_path) and os.path.exists(audio_path):
+            print(f"[{addr}] Recording finished. Merging video and audio...")
             final_video_path = os.path.join(output_folder, "final_video.mp4")
             command = [
-                'ffmpeg',
-                '-y', # Overwrite output file if it exists
-                '-i', video_path,
-                '-i', audio_path,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                final_video_path
+                'ffmpeg', '-y', '-i', video_path, '-i', audio_path,
+                '-c:v', 'copy', '-c:a', 'aac', final_video_path
             ]
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
-                print(f"Successfully merged video and audio to: {final_video_path}")
-                # Clean up temporary files
+                print(f"[{addr}] Successfully merged to: {final_video_path}")
                 os.remove(video_path)
                 os.remove(audio_path)
-                print("Temporary files removed.")
             except FileNotFoundError:
-                print("ERROR: ffmpeg command not found. Please install FFmpeg.")
+                print(f"[{addr}] ERROR: ffmpeg not found. Please install FFmpeg.")
             except subprocess.CalledProcessError as e:
-                print("Error during ffmpeg merging process:")
-                print(e.stderr)
+                print(f"[{addr}] Error during merging:\n{e.stderr}")
+
+def main():
+    mode = ''
+    while mode not in ['stream', 'record']:
+        mode = input("Enter mode ('stream' or 'record'): ").lower()
+
+    device_index = -1
+    if mode == 'stream':
+        p = pyaudio.PyAudio()
+        list_audio_devices(p)
+        try:
+            device_index = int(input("Enter the index of the audio device to use for all streams: "))
+        except ValueError:
+            print("Invalid input. Exiting.")
+            p.terminate()
+            return
+        p.terminate()
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((STREAM_HOST, STREAM_PORT))
+    server_socket.listen(5)  # Allow up to 5 pending connections
+    print(f"Server listening on {STREAM_HOST}:{STREAM_PORT} in {mode} mode...")
+
+    try:
+        while True:
+            conn, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr, mode, device_index))
+            client_thread.start()
+    except KeyboardInterrupt:
+        print("\nShutting down server.")
+    finally:
+        server_socket.close()
+        cv2.destroyAllWindows()
+        print("Server shut down.")
 
 if __name__ == "__main__":
     main()
