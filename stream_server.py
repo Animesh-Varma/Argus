@@ -13,7 +13,7 @@ STREAM_PORT = 8000
 
 # Audio/Video configuration
 FORMAT = pyaudio.paInt16
-CHANNELS = 2
+CHANNELS = 1
 RATE = 48000
 VIDEO_FPS = 20.0
 CHUNK = int(RATE / VIDEO_FPS)
