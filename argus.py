@@ -45,11 +45,7 @@ def main():
                 result, frame_encoded = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
                 video_data = frame_encoded.tobytes()
 
-                try:
-                    audio_data = audio_stream.read(CHUNK, exception_on_overflow=False)
-                except IOError as e:
-                    print(f"Audio input overflow, skipping frame: {e}")
-                    continue
+                audio_data = audio_stream.read(CHUNK)
 
                 video_len = len(video_data)
                 audio_len = len(audio_data)
