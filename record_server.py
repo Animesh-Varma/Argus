@@ -106,7 +106,7 @@ def handle_client(conn, addr):
             final_video_path = os.path.join(output_folder, "final_video.mp4")
             command = [
                 'ffmpeg', '-y', '-i', video_path, '-i', audio_path,
-                '-c:v', 'copy', '-c:a', 'aac', final_video_path
+                '-c:v', 'copy', '-c:a', 'aac', '-shortest', final_video_path
             ]
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
