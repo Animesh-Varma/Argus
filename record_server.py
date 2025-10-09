@@ -19,6 +19,9 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 48000
 VIDEO_FPS = 20.0
+VIDEO_BITRATE = "3000k"
+VIDEO_CRF = 20
+VIDEO_PRESET = "medium"
 CHUNK = int(RATE / VIDEO_FPS)
 
 def handle_client(conn, addr):
@@ -72,7 +75,7 @@ def handle_client(conn, addr):
                 first_frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 if first_frame is not None:
                     height, width, _ = first_frame.shape
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    fourcc = cv2.VideoWriter_fourcc(*'avc1')
                     video_writer = cv2.VideoWriter(video_path, fourcc, VIDEO_FPS, (width, height))
                     video_writer.write(first_frame)
             else:
@@ -105,8 +108,20 @@ def handle_client(conn, addr):
             print(f"[{addr}] Recording finished. Merging video and audio...")
             final_video_path = os.path.join(output_folder, "final_video.mp4")
             command = [
-                'ffmpeg', '-y', '-i', video_path, '-i', audio_path,
-                '-c:v', 'copy', '-c:a', 'aac', '-shortest', final_video_path
+                'ffmpeg', '-y',
+                '-i', video_path,
+                '-i', audio_path,
+                '-c:v', 'libx264',  # H.264 codec
+                '-crf', str(VIDEO_CRF),  # Quality control
+                '-preset', VIDEO_PRESET,  # Encoding speed
+                '-b:v', VIDEO_BITRATE,  # Target bitrate
+                '-maxrate', '4000k',  # Maximum bitrate cap
+                '-bufsize', '8000k',  # Buffer size
+                '-c:a', 'aac',
+                '-b:a', '128k',  # Audio bitrate
+                '-movflags', '+faststart',  # Enable fast web playback
+                '-shortest',
+                final_video_path
             ]
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
