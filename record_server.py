@@ -1,7 +1,6 @@
 import socket
 import cv2
 import numpy as np
-import pyaudio
 import struct
 import os
 import wave
@@ -15,7 +14,6 @@ STREAM_HOST = "0.0.0.0"
 STREAM_PORT = 8000
 
 # Audio/Video configuration
-FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 48000
 VIDEO_FPS = 20.0
@@ -36,7 +34,6 @@ def handle_client(conn, addr):
     audio_path = ""
 
     try:
-        p = pyaudio.PyAudio()
         timestamp = datetime.now().strftime(f"recording_{addr[0]}_{addr[1]}_%Y-%m-%d_%H-%M-%S")
         output_folder = os.path.join("output", timestamp)
         os.makedirs(output_folder, exist_ok=True)
@@ -45,7 +42,7 @@ def handle_client(conn, addr):
         video_path = os.path.join(output_folder, "video.mp4")
         wave_file = wave.open(audio_path, 'wb')
         wave_file.setnchannels(CHANNELS)
-        wave_file.setsampwidth(p.get_sample_size(FORMAT))
+        wave_file.setsampwidth(2)  # 2 bytes for paInt16 format
         wave_file.setframerate(RATE)
 
         data = b""
@@ -98,8 +95,6 @@ def handle_client(conn, addr):
             wave_file.close()
         if video_writer:
             video_writer.release()
-        if p:
-            p.terminate()
         conn.close()
         print(f"Connection with {addr} closed.")
 
