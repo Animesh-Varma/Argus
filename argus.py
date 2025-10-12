@@ -29,6 +29,9 @@ def main():
             print("Connection successful. Starting stream.")
 
             cap = cv2.VideoCapture(0)
+            # Set desired resolution (e.g., 1920x1080)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
             p = pyaudio.PyAudio()
             audio_stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 
