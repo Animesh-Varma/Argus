@@ -1,7 +1,6 @@
 import socket
 import cv2
 import numpy as np
-import pyaudio
 import struct
 import os
 import wave
@@ -15,7 +14,6 @@ STREAM_HOST = "0.0.0.0"
 STREAM_PORT = 8000
 
 # Audio/Video configuration
-FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 48000
 VIDEO_FPS = 20.0
@@ -25,7 +23,6 @@ def handle_client(conn, addr):
     print(f"Recording client connected from {addr}")
     conn.settimeout(120.0)  # Set 2-minute timeout for client inactivity
 
-    p = None
     wave_file = None
     video_writer = None
     output_folder = ""
@@ -33,16 +30,15 @@ def handle_client(conn, addr):
     audio_path = ""
 
     try:
-        p = pyaudio.PyAudio()
         timestamp = datetime.now().strftime(f"recording_{addr[0]}_{addr[1]}_%Y-%m-%d_%H-%M-%S")
         output_folder = os.path.join("output", timestamp)
         os.makedirs(output_folder, exist_ok=True)
 
         audio_path = os.path.join(output_folder, "audio.wav")
-        video_path = os.path.join(output_folder, "video.mp4")
+        video_path = os.path.join(output_folder, "video.ts")
         wave_file = wave.open(audio_path, 'wb')
         wave_file.setnchannels(CHANNELS)
-        wave_file.setsampwidth(p.get_sample_size(FORMAT))
+        wave_file.setsampwidth(2) # Hardcoded for 16-bit audio
         wave_file.setframerate(RATE)
 
         data = b""
@@ -95,8 +91,6 @@ def handle_client(conn, addr):
             wave_file.close()
         if video_writer:
             video_writer.release()
-        if p:
-            p.terminate()
         conn.close()
         print(f"Connection with {addr} closed.")
 
@@ -105,8 +99,14 @@ def handle_client(conn, addr):
             print(f"[{addr}] Recording finished. Merging video and audio...")
             final_video_path = os.path.join(output_folder, "final_video.mp4")
             command = [
-                'ffmpeg', '-y', '-i', video_path, '-i', audio_path,
-                '-c:v', 'copy', '-c:a', 'aac', '-shortest', final_video_path
+                'ffmpeg', '-y',
+                '-r', str(VIDEO_FPS),  # Treat input as constant frame rate
+                '-i', video_path,
+                '-i', audio_path,
+                '-c:v', 'libx264',    # Re-encode video with H.264
+                '-pix_fmt', 'yuv420p', # Standard pixel format for compatibility
+                '-c:a', 'aac',
+                '-shortest', final_video_path
             ]
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
