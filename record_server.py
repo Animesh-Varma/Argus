@@ -23,6 +23,7 @@ def handle_client(conn, addr):
     print(f"Recording client connected from {addr}")
     conn.settimeout(120.0)  # Set 2-minute timeout for client inactivity
 
+    now = datetime.now()
     wave_file = None
     video_writer = None
     output_folder = ""
@@ -30,8 +31,9 @@ def handle_client(conn, addr):
     audio_path = ""
 
     try:
-        timestamp = datetime.now().strftime(f"recording_{addr[0]}_{addr[1]}_%Y-%m-%d_%H-%M-%S")
-        output_folder = os.path.join("output", timestamp)
+        date_folder = os.path.join("output", now.strftime("%Y-%m-%d"))
+        recording_folder_name = now.strftime(f"%H-%M-%S_{addr[0]}")
+        output_folder = os.path.join(date_folder, recording_folder_name)
         os.makedirs(output_folder, exist_ok=True)
 
         audio_path = os.path.join(output_folder, "audio.wav")
@@ -68,7 +70,7 @@ def handle_client(conn, addr):
                 first_frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 if first_frame is not None:
                     height, width, _ = first_frame.shape
-                    fourcc = cv2.VideoWriter_fourcc(*'X264')
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                     video_writer = cv2.VideoWriter(video_path, fourcc, VIDEO_FPS, (width, height))
                     video_writer.write(first_frame)
             else:
@@ -97,7 +99,7 @@ def handle_client(conn, addr):
         # --- Automated Merging & Cleanup ---
         if video_writer is not None:
             print(f"[{addr}] Recording finished. Merging video and audio...")
-            final_video_path = os.path.join(output_folder, "final_video.mp4")
+            final_video_path = os.path.join(output_folder, "recording.mp4")
             command = [
                 'ffmpeg', '-y',
                 '-r', str(VIDEO_FPS),  # Treat input as constant frame rate
