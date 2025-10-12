@@ -68,7 +68,7 @@ def handle_client(conn, addr):
                 first_frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 if first_frame is not None:
                     height, width, _ = first_frame.shape
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    fourcc = cv2.VideoWriter_fourcc(*'X264')
                     video_writer = cv2.VideoWriter(video_path, fourcc, VIDEO_FPS, (width, height))
                     video_writer.write(first_frame)
             else:
